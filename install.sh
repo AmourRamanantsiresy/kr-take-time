@@ -6,8 +6,8 @@
 # are pulled from the network) — it reconfigures the NICs at the end.
 set -euo pipefail
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$APP_DIR"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_DIR"
 
 log()  { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m!!  %s\033[0m\n' "$*"; }
@@ -65,6 +65,10 @@ import ipaddress, sys
 print(ipaddress.ip_network(sys.argv[1], strict=False).netmask)
 EOF
 )"
+# Runtime deploy target. The repo often lives under /home/<user>, which
+# the cybera service user and caddy cannot traverse (0700 home dirs) —
+# the built app is copied to /opt where services can read it.
+APP_DIR=/opt/cybera
 export LAN_NETMASK APP_DIR
 
 # ── 3. Packages ───────────────────────────────────────────────────────
@@ -72,7 +76,7 @@ log "Installing packages (needs internet!)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y nftables dnsmasq opennds postgresql caddy curl \
-  ca-certificates sudo gettext-base python3 ifupdown
+  ca-certificates sudo gettext-base python3 ifupdown rsync
 
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -c2-3 | tr -d .)" -lt 20 ]; then
   log "Installing Node.js 22 LTS (NodeSource)"
@@ -109,7 +113,13 @@ log "Building frontend"
 log "Running migrations and seeding admin user"
 (cd backend && node dist/scripts/migrate.js && node dist/scripts/seed-admin.js)
 
-# ── 8. Render config templates ────────────────────────────────────────
+# ── 8. Deploy runtime to /opt ─────────────────────────────────────────
+log "Deploying runtime to $APP_DIR"
+install -d "$APP_DIR/backend" "$APP_DIR/frontend"
+rsync -a --delete backend/dist backend/node_modules backend/migrations backend/package.json "$APP_DIR/backend/"
+rsync -a --delete frontend/dist "$APP_DIR/frontend/"
+
+# ── 9. Render config templates ────────────────────────────────────────
 log "Rendering configuration"
 TVARS='${WAN_IF} ${LAN_IF} ${LAN_SUBNET} ${LAN_GATEWAY_IP} ${LAN_NETMASK} ${DHCP_RANGE} ${GATEWAY_NAME} ${PORTAL_HOST} ${FAS_KEY} ${BACKEND_PORT} ${APP_DIR} ${NDSCTL_PATH}'
 render() { envsubst "$TVARS" < "$1" > "$2"; }
@@ -134,7 +144,7 @@ install -d -m 750 -o root -g cybera /etc/cybera
 chown root:cybera /etc/cybera/cybera.env
 chmod 640 /etc/cybera/cybera.env
 
-# ── 9. USB autosuspend off for the WAN adapter ────────────────────────
+# ── 10. USB autosuspend off for USB gateway interfaces ────────────────
 log "Disabling USB autosuspend for USB-attached gateway interfaces"
 install -m 755 scripts/cybera-usb-nosuspend /usr/local/bin/cybera-usb-nosuspend
 render configs/udev-usb-wan.rules.tmpl /etc/udev/rules.d/90-cybera-usb-wan.rules
@@ -142,16 +152,30 @@ udevadm control --reload
 /usr/local/bin/cybera-usb-nosuspend "$WAN_IF" || true
 /usr/local/bin/cybera-usb-nosuspend "$LAN_IF" || true
 
-# ── 10. Scoped sudoers for ndsctl ─────────────────────────────────────
+# ── 11. Scoped sudoers for ndsctl ─────────────────────────────────────
 log "Installing scoped sudoers entry (cybera -> ndsctl only)"
 render configs/sudoers-cybera.tmpl /etc/sudoers.d/cybera
 chmod 440 /etc/sudoers.d/cybera
 visudo -cf /etc/sudoers.d/cybera >/dev/null || die "generated sudoers entry is invalid"
 
-# ── 11. systemd units + service enablement ────────────────────────────
+# ── 12. systemd units + service enablement ────────────────────────────
 log "Installing systemd units"
 render configs/systemd/cybera-backend.service.tmpl         /etc/systemd/system/cybera-backend.service
 render configs/systemd/cybera-session-manager.service.tmpl /etc/systemd/system/cybera-session-manager.service
+
+# OpenNDS must outlive a slow-appearing LAN interface (USB adapters
+# enumerate late at boot); the stock unit gives up instead of retrying.
+install -d /etc/systemd/system/opennds.service.d
+cat > /etc/systemd/system/opennds.service.d/cybera.conf <<'OVEOF'
+[Unit]
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=on-failure
+RestartSec=5
+OVEOF
+
 systemctl daemon-reload
 
 log "Applying network configuration"
@@ -213,7 +237,7 @@ systemctl restart cybera-backend
 systemctl enable --now cybera-session-manager
 systemctl restart cybera-session-manager
 
-# ── 12. Summary ───────────────────────────────────────────────────────
+# ── 13. Summary ───────────────────────────────────────────────────────
 log "Install complete"
 cat <<EOF
 

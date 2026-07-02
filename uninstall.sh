@@ -23,6 +23,8 @@ rm -f /etc/network/interfaces.d/cybera
 rm -f /etc/sysctl.d/90-cybera.conf
 rm -f /etc/udev/rules.d/90-cybera-usb-wan.rules
 rm -f /etc/NetworkManager/conf.d/90-cybera-unmanaged.conf
+rm -rf /etc/systemd/system/opennds.service.d
+rm -rf /opt/cybera
 rm -f /usr/local/bin/cybera-usb-nosuspend
 rm -rf /etc/cybera
 udevadm control --reload 2>/dev/null || true
