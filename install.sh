@@ -78,7 +78,7 @@ log "Installing packages (needs internet!)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y nftables dnsmasq opennds postgresql caddy curl \
-  ca-certificates sudo gettext-base python3 ifupdown rsync
+  ca-certificates sudo gettext-base python3 ifupdown rsync conntrack
 
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -c2-3 | tr -d .)" -lt 20 ]; then
   log "Installing Node.js 22 LTS (NodeSource)"
@@ -87,7 +87,8 @@ if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -c2-3 | tr -d .)" -lt
 fi
 
 NDSCTL_PATH="$(command -v ndsctl)" || die "ndsctl not found after installing opennds"
-export NDSCTL_PATH
+CONNTRACK_PATH="$(command -v conntrack)" || die "conntrack not found after installing conntrack"
+export NDSCTL_PATH CONNTRACK_PATH
 
 # ── 4. Service user ───────────────────────────────────────────────────
 if ! id cybera >/dev/null 2>&1; then
@@ -123,7 +124,7 @@ rsync -a --delete frontend/dist "$APP_DIR/frontend/"
 
 # ── 9. Render config templates ────────────────────────────────────────
 log "Rendering configuration"
-TVARS='${WAN_IF} ${LAN_IF} ${LAN_SUBNET} ${LAN_GATEWAY_IP} ${LAN_NETMASK} ${DHCP_RANGE} ${GATEWAY_NAME} ${PORTAL_HOST} ${FAS_KEY} ${FAS_PORT} ${BACKEND_PORT} ${APP_DIR} ${NDSCTL_PATH}'
+TVARS='${WAN_IF} ${LAN_IF} ${LAN_SUBNET} ${LAN_GATEWAY_IP} ${LAN_NETMASK} ${DHCP_RANGE} ${GATEWAY_NAME} ${PORTAL_HOST} ${FAS_KEY} ${FAS_PORT} ${BACKEND_PORT} ${APP_DIR} ${NDSCTL_PATH} ${CONNTRACK_PATH}'
 render() { envsubst "$TVARS" < "$1" > "$2"; }
 
 render configs/nftables.conf.tmpl  /etc/nftables.conf
@@ -148,6 +149,7 @@ install -d -m 750 -o root -g cybera /etc/cybera
 {
   cat .env
   echo "NDSCTL_PATH=$NDSCTL_PATH"
+  echo "CONNTRACK_PATH=$CONNTRACK_PATH"
   echo "NODE_ENV=production"
 } > /etc/cybera/cybera.env
 chown root:cybera /etc/cybera/cybera.env

@@ -9,10 +9,18 @@ interface ActiveSessionRow {
   id: number;
   user_id: number;
   device_mac: string;
+  ip: string;
+  started_at: Date;
   last_tick: Date;
   remaining_seconds: string;
   username: string;
 }
+
+/* /session/connect commits the session row BEFORE ndsctl auth runs; a
+   tick landing in that gap would end the brand-new session and then
+   deauth the freshly-authorized client as an orphan. Sessions younger
+   than this are left alone when their MAC is not (yet) online. */
+const CONNECT_GRACE_MS = 60_000;
 
 const pool = new Pool({
   host: env.dbHost(),
@@ -30,19 +38,19 @@ const ndsctl = async (...args: string[]): Promise<string> => {
   return stdout.trim();
 };
 
-const authedMacs = async (): Promise<Set<string>> => {
+const authedClients = async (): Promise<Map<string, string>> => {
   const raw = await ndsctl('json');
   const parsed = JSON.parse(raw);
-  const macs = new Set<string>();
+  const clients = new Map<string, string>();
   const list = parsed.clients ?? {};
   for (const key of Object.keys(list)) {
     const c = list[key];
     const state = String(c.state ?? '').toLowerCase();
     if (state.includes('auth') && !state.includes('preauth')) {
-      macs.add(String(c.mac ?? key).toLowerCase());
+      clients.set(String(c.mac ?? key).toLowerCase(), String(c.ip ?? ''));
     }
   }
-  return macs;
+  return clients;
 };
 
 const deauth = async (mac: string) => {
@@ -50,6 +58,20 @@ const deauth = async (mac: string) => {
     await ndsctl('deauth', mac);
   } catch (err) {
     console.warn(`deauth ${mac} failed (already gone?)`);
+  }
+};
+
+/* OpenNDS offloads authenticated flows to a flowtable, so established
+   connections survive a deauth — killing the conntrack entries makes
+   the cutoff immediate. Non-zero exit (nothing matched) is fine. */
+const flushConntrack = async (ip: string) => {
+  if (!ip) return;
+  try {
+    await execFileAsync('sudo', [env.conntrackPath(), '-D', '-s', ip], {
+      timeout: 10_000,
+    });
+  } catch {
+    return;
   }
 };
 
@@ -74,7 +96,7 @@ const auditCutoff = async (userId: number, mac: string, reason: string) => {
    never double-charge: last_tick only advances together with the
    balance decrement. */
 const tick = async () => {
-  const online = await authedMacs();
+  const online = await authedClients();
 
   const usersToCut = new Set<number>();
   await (async () => {
@@ -82,7 +104,7 @@ const tick = async () => {
     try {
       await client.query('BEGIN');
       const { rows: sessions } = await client.query<ActiveSessionRow>(
-        `SELECT s.id, s.user_id, s.device_mac, s.last_tick,
+        `SELECT s.id, s.user_id, s.device_mac, s.ip, s.started_at, s.last_tick,
                 u.remaining_seconds, u.username
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.status = 'active'
@@ -94,10 +116,13 @@ const tick = async () => {
       for (const session of sessions) {
         const mac = session.device_mac.toLowerCase();
         if (!online.has(mac)) {
-          await client.query(
-            `UPDATE sessions SET status = 'ended', ended_at = now() WHERE id = $1`,
-            [session.id],
-          );
+          const age = now - new Date(session.started_at).getTime();
+          if (age > CONNECT_GRACE_MS) {
+            await client.query(
+              `UPDATE sessions SET status = 'ended', ended_at = now() WHERE id = $1`,
+              [session.id],
+            );
+          }
           continue;
         }
 
@@ -123,8 +148,8 @@ const tick = async () => {
         }
       }
 
-      const { rows: exhausted } = await client.query<{ id: number; device_mac: string; user_id: number }>(
-        `SELECT s.id, s.device_mac, s.user_id
+      const { rows: exhausted } = await client.query<{ id: number; device_mac: string; ip: string; user_id: number }>(
+        `SELECT s.id, s.device_mac, s.ip, s.user_id
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.status = 'active' AND u.remaining_seconds <= 0`,
       );
@@ -142,6 +167,7 @@ const tick = async () => {
         const mac = session.device_mac.toLowerCase();
         console.log(`balance exhausted: cutting off ${mac} (user ${session.user_id})`);
         await deauth(mac);
+        await flushConntrack(session.ip);
         await auditCutoff(session.user_id, mac, 'balance_exhausted');
       }
     } catch (err) {
@@ -156,10 +182,11 @@ const tick = async () => {
     `SELECT device_mac FROM sessions WHERE status = 'active'`,
   );
   const known = new Set(stillActive.map((r) => r.device_mac.toLowerCase()));
-  for (const mac of online) {
+  for (const [mac, ip] of online) {
     if (!known.has(mac)) {
       console.log(`orphan authenticated client ${mac} — deauthing`);
       await deauth(mac);
+      await flushConntrack(ip);
     }
   }
 };

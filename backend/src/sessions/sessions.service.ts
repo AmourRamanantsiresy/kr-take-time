@@ -30,6 +30,19 @@ export class SessionsService {
       throw new ForbiddenException('Invalid portal context — reconnect to the Wi-Fi and try again');
     }
 
+    const recentKick = await this.db.one(
+      `SELECT 1 AS x FROM sessions
+       WHERE device_mac = $1 AND status = 'kicked'
+         AND ended_at > now() - make_interval(secs => $2)
+       LIMIT 1`,
+      [mac, env.kickCooldownSeconds()],
+    );
+    if (recentKick) {
+      throw new ForbiddenException(
+        'This device was disconnected by staff — please ask at the counter',
+      );
+    }
+
     const { timeoutSeconds } = await this.db.tx(async (tx) => {
       const { rows: userRows } = await tx.query<UserRow>(
         'SELECT * FROM users WHERE id = $1 FOR UPDATE',
@@ -93,15 +106,28 @@ export class SessionsService {
     return { ok: true, mac, timeoutSeconds };
   };
 
+  /* Kick = deauth + kill the device's live flows + a server-side
+     cooldown (KICK_COOLDOWN_SECONDS) during which /session/connect
+     refuses the MAC, so the portal's auto-connect cannot immediately
+     undo the kick. */
   kick = async (actor: AuthUser, mac: string) => {
     const normalized = mac.toLowerCase();
+    const active = await this.db.query<{ ip: string }>(
+      `SELECT ip FROM sessions WHERE device_mac = $1 AND status = 'active'`,
+      [normalized],
+    );
     await this.ndsctl.deauth(normalized);
+    for (const session of active) {
+      await this.ndsctl.flushConntrack(session.ip);
+    }
     await this.db.query(
       `UPDATE sessions SET status = 'kicked', ended_at = now()
        WHERE device_mac = $1 AND status = 'active'`,
       [normalized],
     );
-    await this.audit.log(actor.id, 'session.kick', `mac:${normalized}`, {});
+    await this.audit.log(actor.id, 'session.kick', `mac:${normalized}`, {
+      cooldownSeconds: env.kickCooldownSeconds(),
+    });
     return { ok: true };
   };
 

@@ -45,6 +45,23 @@ export class NdsctlService {
     }
   };
 
+  /* OpenNDS offloads authenticated flows to an nftables flowtable;
+     offloaded flows bypass the forward chains, so ESTABLISHED
+     connections survive a deauth until they close on their own. Killing
+     the client's conntrack entries makes a kick/cutoff bite instantly.
+     conntrack exits non-zero when nothing matched — that's fine. */
+  flushConntrack = async (ip: string): Promise<void> => {
+    if (!ip) return;
+    try {
+      await execFileAsync('sudo', [env.conntrackPath(), '-D', '-s', ip], {
+        timeout: 10_000,
+      });
+      this.logger.log(`flushed conntrack for ${ip}`);
+    } catch {
+      return;
+    }
+  };
+
   /* Returns the currently-known clients from `ndsctl json`, normalized
      to lowercase MACs. Shape across opennds versions varies slightly,
      so parsing is defensive. */
