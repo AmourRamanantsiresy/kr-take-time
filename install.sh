@@ -63,7 +63,7 @@ log "Installing packages (needs internet!)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y nftables dnsmasq opennds postgresql caddy curl \
-  ca-certificates sudo gettext-base python3
+  ca-certificates sudo gettext-base python3 ifupdown
 
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -c2-3 | tr -d .)" -lt 20 ]; then
   log "Installing Node.js 22 LTS (NodeSource)"
@@ -144,12 +144,25 @@ systemctl daemon-reload
 log "Applying network configuration"
 sysctl --system >/dev/null
 
+# Desktop installs: NetworkManager must hand the gateway NICs over to
+# ifupdown, or it will keep rewriting their addresses.
+if systemctl is-active --quiet NetworkManager 2>/dev/null; then
+  warn "NetworkManager detected — marking $WAN_IF and $LAN_IF as unmanaged"
+  install -d /etc/NetworkManager/conf.d
+  cat > /etc/NetworkManager/conf.d/90-cybera-unmanaged.conf <<NMEOF
+[keyfile]
+unmanaged-devices=interface-name:${WAN_IF};interface-name:${LAN_IF}
+NMEOF
+  systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager
+fi
+
 # dnsmasq must own :53 — make sure nothing else does
 if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
   warn "systemd-resolved is active — disabling its stub listener"
   systemctl disable --now systemd-resolved
 fi
 
+ifup "$WAN_IF" 2>/dev/null || true
 ifup "$LAN_IF" 2>/dev/null || ip addr replace "${LAN_GATEWAY_IP}/$(echo "$LAN_SUBNET" | cut -d/ -f2)" dev "$LAN_IF"
 ip link set "$LAN_IF" up
 
