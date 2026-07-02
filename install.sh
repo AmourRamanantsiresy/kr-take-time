@@ -128,6 +128,12 @@ render configs/nftables.conf.tmpl  /etc/nftables.conf
 render configs/dnsmasq.conf.tmpl   /etc/dnsmasq.d/cybera.conf
 install -d /etc/config
 render configs/opennds.conf.tmpl   /etc/config/opennds
+
+# The gateway itself must resolve PORTAL_HOST (opennds refuses to start
+# if fasremotefqdn does not resolve to fasremoteip, and the host's own
+# resolver points at the WAN, not at our LAN-only dnsmasq).
+sed -i '/# cybera-portal$/d' /etc/hosts
+echo "$LAN_GATEWAY_IP $PORTAL_HOST # cybera-portal" >> /etc/hosts
 render configs/Caddyfile.tmpl      /etc/caddy/Caddyfile
 render configs/interfaces.tmpl     /etc/network/interfaces.d/cybera
 if [ "$WAN_IS_WIFI" -eq 0 ]; then
