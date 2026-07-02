@@ -12,6 +12,15 @@ config opennds
 	option gatewayport '2050'
 	option maxclients '250'
 
+	# Must be the literal string 'disabled' (not 'disable'): opennds only
+	# whitelists fasport on the client→router INPUT path when
+	# fas_remotefqdn == gatewayfqdn, and with fasremotefqdn unset it
+	# defaults to "disabled" (fw_iptables.c). The default gatewayfqdn
+	# 'status.client' fails that comparison and preauth clients get
+	# connection-refused on the FAS port. Costs only the unused
+	# status.client convenience page.
+	option gatewayfqdn 'disabled'
+
 	# FAS: our NestJS backend, reached through Caddy at /fas.
 	# fasremoteip/fasremotefqdn are deliberately NOT set: opennds then
 	# defaults the FAS to the gateway address and treats it as LOCAL,
