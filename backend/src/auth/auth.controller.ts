@@ -9,7 +9,7 @@ import {
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './auth.dto';
+import { ClientLoginDto, LoginDto, RegisterDto } from './auth.dto';
 import { AUTH_COOKIE, JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AuthUser } from '../common/types';
@@ -34,6 +34,18 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const user = await this.auth.register(dto.username, dto.password);
+    res.cookie(AUTH_COOKIE, await this.auth.sign(user), COOKIE_OPTS);
+    return user;
+  }
+
+  @Post('client')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async client(
+    @Body() dto: ClientLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = await this.auth.clientLogin(dto.number);
     res.cookie(AUTH_COOKIE, await this.auth.sign(user), COOKIE_OPTS);
     return user;
   }

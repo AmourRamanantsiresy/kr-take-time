@@ -18,14 +18,15 @@ export interface Plan {
 export interface PlanRequest {
   id: number;
   user_id: number;
-  plan_id: number;
+  plan_id: number | null;
+  requested_minutes: number | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   username?: string;
-  plan_name?: string;
-  duration_minutes?: number;
-  price?: string;
-  device_limit?: number;
+  plan_name?: string | null;
+  duration_minutes?: number | null;
+  price?: string | null;
+  device_limit?: number | null;
 }
 
 export interface Balance {

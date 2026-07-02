@@ -2,11 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
 import { AppStyle } from './style';
 import { useAuth } from './auth/AuthContext';
-import { AuthPage } from './pages/auth/AuthPage';
-import { PortalLayout } from './pages/portal/PortalLayout';
-import { StatusPage } from './pages/portal/StatusPage';
-import { PlansPage } from './pages/portal/PlansPage';
-import { VoucherPage } from './pages/portal/VoucherPage';
+import { ClientPortal } from './pages/client/ClientPortal';
+import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminOverview } from './pages/admin/AdminOverview';
 import { AdminPlans } from './pages/admin/AdminPlans';
@@ -27,17 +24,15 @@ export const App = () => {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/portal" /> : <AuthPage />} />
-      <Route path="/portal" element={user ? <PortalLayout /> : <Navigate to={`/login${window.location.search}`} />}>
-        <Route index element={<StatusPage />} />
-        <Route path="plans" element={<PlansPage />} />
-        <Route path="voucher" element={<VoucherPage />} />
-      </Route>
+      <Route path="/portal" element={<ClientPortal />} />
+      <Route path="/remain" element={<ClientPortal />} />
+      <Route
+        path="/admin/login"
+        element={user?.role === 'admin' ? <Navigate to="/admin" /> : <AdminLogin />}
+      />
       <Route
         path="/admin"
-        element={
-          user?.role === 'admin' ? <AdminLayout /> : <Navigate to="/login" />
-        }
+        element={user?.role === 'admin' ? <AdminLayout /> : <Navigate to="/admin/login" />}
       >
         <Route index element={<AdminOverview />} />
         <Route path="plans" element={<AdminPlans />} />

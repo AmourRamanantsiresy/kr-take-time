@@ -93,12 +93,13 @@ export const AdminOverview = () => {
               )}
               {pending.map((request) => (
                 <TableRow key={request.id}>
-                  <TableCell>{request.username}</TableCell>
+                  <TableCell>Client N° {request.username}</TableCell>
                   <TableCell>
-                    {request.plan_name} ({request.duration_minutes} min,{' '}
-                    {request.device_limit} dev)
+                    {request.plan_name
+                      ? `${request.plan_name} (${request.duration_minutes} min, ${request.device_limit} dev)`
+                      : `${request.requested_minutes} min (custom)`}
                   </TableCell>
-                  <TableCell>{request.price}</TableCell>
+                  <TableCell>{request.price ?? '—'}</TableCell>
                   <TableCell>{formatDate(request.created_at)}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">

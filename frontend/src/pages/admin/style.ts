@@ -1,5 +1,25 @@
 import { SxProps } from '@mui/material';
 
+export const AdminLoginStyle: SxProps = {
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  px: 2,
+  '& .login-card': {
+    width: '100%',
+    maxWidth: 380,
+    p: 3,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  '& .login-title': {
+    textAlign: 'center',
+    fontWeight: 700,
+  },
+};
+
 export const AdminLayoutStyle: SxProps = {
   minHeight: '100vh',
   '& .admin-title': {

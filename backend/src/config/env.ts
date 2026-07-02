@@ -22,6 +22,7 @@ export const env = {
   ndsctlPath: () => optional('NDSCTL_PATH', '/usr/sbin/ndsctl'),
   adminUser: () => required('ADMIN_USER'),
   adminPass: () => required('ADMIN_PASS'),
+  clientCount: () => parseInt(optional('CLIENT_COUNT', '100'), 10),
   sessionTickSeconds: () => parseInt(optional('SESSION_TICK_SECONDS', '15'), 10),
   maxSessionSeconds: () => parseInt(optional('MAX_SESSION_SECONDS', '86400'), 10),
   isProduction: () => optional('NODE_ENV', 'development') === 'production',

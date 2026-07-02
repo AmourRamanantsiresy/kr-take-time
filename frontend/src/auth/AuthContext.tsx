@@ -15,7 +15,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<AuthUser>;
-  register: (username: string, password: string) => Promise<AuthUser>;
+  clientLogin: (number: number) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
@@ -25,7 +25,7 @@ const AuthContext = createContext<AuthContextValue>({
   login: async () => {
     throw new Error('AuthProvider missing');
   },
-  register: async () => {
+  clientLogin: async () => {
     throw new Error('AuthProvider missing');
   },
   logout: async () => undefined,
@@ -53,10 +53,10 @@ export const AuthProvider: FC<AuthProviderProps> = (props) => {
     return logged;
   }, []);
 
-  const register = useCallback(async (username: string, password: string) => {
-    const created = await api.post<AuthUser>('/api/auth/register', { username, password });
-    setUser(created);
-    return created;
+  const clientLogin = useCallback(async (number: number) => {
+    const logged = await api.post<AuthUser>('/api/auth/client', { number });
+    setUser(logged);
+    return logged;
   }, []);
 
   const logout = useCallback(async () => {
@@ -65,8 +65,8 @@ export const AuthProvider: FC<AuthProviderProps> = (props) => {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading, login, register, logout],
+    () => ({ user, loading, login, clientLogin, logout }),
+    [user, loading, login, clientLogin, logout],
   );
 
   return <AuthContext.Provider value={value}>{props.children}</AuthContext.Provider>;

@@ -33,6 +33,19 @@ export class AuthService {
     return { id: user!.id, username: user!.username, role: user!.role };
   };
 
+  /* Walk-in café flow: customers identify by their seat/client number
+     (accounts "1".."N" are pre-seeded with unusable passwords). No
+     password — the admin at the counter is the human security layer. */
+  clientLogin = async (number: number): Promise<AuthUser> => {
+    const user = await this.db.one<UserRow>(
+      `SELECT * FROM users WHERE username = $1 AND role = 'customer'`,
+      [String(number)],
+    );
+    if (!user) throw new UnauthorizedException('Unknown client number');
+    await this.audit.log(user.id, 'auth.client', `user:${user.id}`, { number });
+    return { id: user.id, username: user.username, role: user.role };
+  };
+
   login = async (username: string, password: string): Promise<AuthUser> => {
     const user = await this.db.one<UserRow>(
       'SELECT * FROM users WHERE username = $1',

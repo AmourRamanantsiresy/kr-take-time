@@ -1,4 +1,12 @@
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -13,6 +21,13 @@ export class RegisterDto {
   @MinLength(6)
   @MaxLength(128)
   password: string;
+}
+
+export class ClientLoginDto {
+  @IsInt()
+  @Min(1)
+  @Max(999)
+  number: number;
 }
 
 export class LoginDto {

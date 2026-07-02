@@ -12,7 +12,7 @@ export class RequestsController {
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateRequestDto) {
-    return this.requests.create(user, dto.plan_id);
+    return this.requests.create(user, dto.plan_id, dto.minutes);
   }
 
   @Get()
