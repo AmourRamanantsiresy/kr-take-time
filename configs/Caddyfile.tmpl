@@ -1,10 +1,16 @@
 # Rendered from configs/Caddyfile.tmpl — do not edit by hand.
 # Captive-portal clients must reach the portal over plain HTTP (no public
 # CA can issue for a LAN-only name, and self-signed certs break captive
-# browsers), so the portal is served on :80. Explicit http:// prefixes
-# disable Caddy's automatic-HTTPS redirect for these hosts.
+# browsers). Explicit http:// prefixes disable Caddy's automatic-HTTPS
+# redirect for these hosts.
+#
+# The same site is served on two ports:
+#   :${FAS_PORT} — the captive-portal loop. OpenNDS reserves :80 for its
+#                  own redirects, so unauthenticated clients do the whole
+#                  FAS → login → connect flow on this port.
+#   :80          — normal access for already-authenticated users/admins.
 
-http://${PORTAL_HOST}, http://${LAN_GATEWAY_IP} {
+(cybera_site) {
 	encode gzip
 
 	handle /api/* {
@@ -20,4 +26,12 @@ http://${PORTAL_HOST}, http://${LAN_GATEWAY_IP} {
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+http://${PORTAL_HOST}, http://${LAN_GATEWAY_IP} {
+	import cybera_site
+}
+
+http://${PORTAL_HOST}:${FAS_PORT}, http://${LAN_GATEWAY_IP}:${FAS_PORT} {
+	import cybera_site
 }

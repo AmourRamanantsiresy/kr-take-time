@@ -12,12 +12,14 @@ config opennds
 	option gatewayport '2050'
 	option maxclients '250'
 
-	# FAS: our NestJS backend, reached through Caddy on port 80 at /fas.
-	# fasremotefqdn must resolve (via dnsmasq) to fasremoteip.
+	# FAS: our NestJS backend, reached through Caddy at /fas. Port 80 is
+	# reserved by opennds for its own redirects when the FAS sits on the
+	# gateway IP, so Caddy exposes the portal on FAS_PORT as well.
+	# fasremotefqdn must resolve (via dnsmasq / /etc/hosts) to fasremoteip.
 	# fas_secure_enabled 1 → the query string arrives base64 encoded and
 	# carries the hashed client id (hid). Authorization itself is done by
 	# the backend via `ndsctl auth`, never by returning tokens to clients.
-	option fasport '80'
+	option fasport '${FAS_PORT}'
 	option faspath '/fas'
 	option fasremoteip '${LAN_GATEWAY_IP}'
 	option fasremotefqdn '${PORTAL_HOST}'

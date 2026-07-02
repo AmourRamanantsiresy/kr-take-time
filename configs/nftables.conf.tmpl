@@ -16,7 +16,7 @@ table inet filter {
 
     # LAN: DHCP, DNS, portal HTTP(S), OpenNDS gateway port, SSH
     iifname "${LAN_IF}" udp dport { 53, 67 } accept
-    iifname "${LAN_IF}" tcp dport { 53, 80, 443, 2050 } accept
+    iifname "${LAN_IF}" tcp dport { 53, 80, 443, 2050, ${FAS_PORT} } accept
     iifname "${LAN_IF}" tcp dport 22 accept
     iifname "${LAN_IF}" icmp type echo-request accept
 

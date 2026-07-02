@@ -29,6 +29,8 @@ log "Detected network interfaces:"
 ip -o link show | awk -F': ' '{print "    " $2}' | grep -v '^    lo$' || true
 
 set -a; . ./.env; set +a
+FAS_PORT="${FAS_PORT:-8080}"
+export FAS_PORT
 
 for v in WAN_IF LAN_IF LAN_SUBNET LAN_GATEWAY_IP DHCP_RANGE GATEWAY_NAME \
          PORTAL_HOST FAS_KEY DB_NAME DB_USER DB_PASS JWT_SECRET \
@@ -121,7 +123,7 @@ rsync -a --delete frontend/dist "$APP_DIR/frontend/"
 
 # ── 9. Render config templates ────────────────────────────────────────
 log "Rendering configuration"
-TVARS='${WAN_IF} ${LAN_IF} ${LAN_SUBNET} ${LAN_GATEWAY_IP} ${LAN_NETMASK} ${DHCP_RANGE} ${GATEWAY_NAME} ${PORTAL_HOST} ${FAS_KEY} ${BACKEND_PORT} ${APP_DIR} ${NDSCTL_PATH}'
+TVARS='${WAN_IF} ${LAN_IF} ${LAN_SUBNET} ${LAN_GATEWAY_IP} ${LAN_NETMASK} ${DHCP_RANGE} ${GATEWAY_NAME} ${PORTAL_HOST} ${FAS_KEY} ${FAS_PORT} ${BACKEND_PORT} ${APP_DIR} ${NDSCTL_PATH}'
 render() { envsubst "$TVARS" < "$1" > "$2"; }
 
 render configs/nftables.conf.tmpl  /etc/nftables.conf
