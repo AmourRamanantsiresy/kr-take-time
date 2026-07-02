@@ -28,10 +28,14 @@
 	}
 }
 
-http://${PORTAL_HOST}, http://${LAN_GATEWAY_IP} {
+# Host-agnostic on purpose: captive-portal clients reach us by
+# PORTAL_HOST, by raw IP, or by whatever Host their popup browser sends.
+# A host-matched site would answer unknown Hosts with Caddy's bare empty
+# 200 — which renders as a blank page.
+http://:80 {
 	import cybera_site
 }
 
-http://${PORTAL_HOST}:${FAS_PORT}, http://${LAN_GATEWAY_IP}:${FAS_PORT} {
+http://:${FAS_PORT} {
 	import cybera_site
 }
