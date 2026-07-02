@@ -1,0 +1,13 @@
+# Rendered from configs/interfaces.tmpl — do not edit by hand.
+# Installed to /etc/network/interfaces.d/cybera
+# WAN (USB adapter, faces Starlink) gets its address via DHCP.
+# LAN (onboard NIC, faces the AP/bridge router) is the static gateway.
+
+auto ${WAN_IF}
+allow-hotplug ${WAN_IF}
+iface ${WAN_IF} inet dhcp
+
+auto ${LAN_IF}
+iface ${LAN_IF} inet static
+    address ${LAN_GATEWAY_IP}
+    netmask ${LAN_NETMASK}

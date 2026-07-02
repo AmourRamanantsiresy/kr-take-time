@@ -1,0 +1,23 @@
+# Rendered from configs/Caddyfile.tmpl — do not edit by hand.
+# Captive-portal clients must reach the portal over plain HTTP (no public
+# CA can issue for a LAN-only name, and self-signed certs break captive
+# browsers), so the portal is served on :80. Explicit http:// prefixes
+# disable Caddy's automatic-HTTPS redirect for these hosts.
+
+http://${PORTAL_HOST}, http://${LAN_GATEWAY_IP} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:${BACKEND_PORT}
+	}
+
+	handle /fas* {
+		reverse_proxy 127.0.0.1:${BACKEND_PORT}
+	}
+
+	handle {
+		root * ${APP_DIR}/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

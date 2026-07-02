@@ -1,0 +1,19 @@
+#!/bin/sh
+# Walks from a network interface up to its USB device and writes "on" to
+# power/control, disabling autosuspend for that device. Called from the
+# udev rule installed by install.sh; safe to run manually:
+#   cybera-usb-nosuspend <interface>
+set -eu
+
+IFACE="$1"
+DEV="$(readlink -f "/sys/class/net/${IFACE}/device" 2>/dev/null || true)"
+[ -n "$DEV" ] || exit 0
+
+while [ "$DEV" != "/" ]; do
+  if [ -f "$DEV/power/control" ] && [ -f "$DEV/idVendor" ]; then
+    echo on > "$DEV/power/control"
+    exit 0
+  fi
+  DEV="$(dirname "$DEV")"
+done
+exit 0

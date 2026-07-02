@@ -1,0 +1,5 @@
+# Rendered from configs/sudoers-cybera.tmpl — do not edit by hand.
+# Installed to /etc/sudoers.d/cybera (0440).
+# The backend/session-manager run as the unprivileged "cybera" user; the
+# ONLY privileged operation they may perform is ndsctl.
+cybera ALL=(root) NOPASSWD: ${NDSCTL_PATH}

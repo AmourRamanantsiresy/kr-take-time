@@ -1,0 +1,23 @@
+# Rendered from configs/systemd/cybera-backend.service.tmpl
+[Unit]
+Description=Cybera captive-portal backend (NestJS + OpenNDS FAS)
+After=network-online.target postgresql.service opennds.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=cybera
+Group=cybera
+WorkingDirectory=${APP_DIR}/backend
+EnvironmentFile=/etc/cybera/cybera.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=no
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

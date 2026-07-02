@@ -1,0 +1,23 @@
+# Rendered from configs/systemd/cybera-session-manager.service.tmpl
+[Unit]
+Description=Cybera session manager (balance reconciler / auto-cutoff)
+After=network-online.target postgresql.service opennds.service cybera-backend.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=cybera
+Group=cybera
+WorkingDirectory=${APP_DIR}/backend
+EnvironmentFile=/etc/cybera/cybera.env
+ExecStart=/usr/bin/node dist/session-manager/main.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=no
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

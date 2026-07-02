@@ -1,0 +1,49 @@
+#!/usr/sbin/nft -f
+# Rendered from configs/nftables.conf.tmpl — do not edit by hand.
+# Base gateway rules only. OpenNDS injects its own nftables chains at
+# runtime to gate unauthenticated clients; this file must NOT try to
+# replicate that logic.
+
+flush ruleset
+
+table inet filter {
+  chain input {
+    type filter hook input priority 0; policy drop;
+
+    iif lo accept
+    ct state established,related accept
+    ct state invalid drop
+
+    # LAN: DHCP, DNS, portal HTTP(S), OpenNDS gateway port, SSH
+    iifname "${LAN_IF}" udp dport { 53, 67 } accept
+    iifname "${LAN_IF}" tcp dport { 53, 80, 443, 2050 } accept
+    iifname "${LAN_IF}" tcp dport 22 accept
+    iifname "${LAN_IF}" icmp type echo-request accept
+
+    # WAN: allow SSH for remote admin (remove if undesired), ping
+    iifname "${WAN_IF}" tcp dport 22 accept
+    iifname "${WAN_IF}" icmp type echo-request accept
+  }
+
+  chain forward {
+    type filter hook forward priority 0; policy drop;
+
+    ct state established,related accept
+    ct state invalid drop
+
+    # LAN -> WAN. OpenNDS's own chains (priority -100 on the LAN side)
+    # drop/redirect unauthenticated clients before this is reached.
+    iifname "${LAN_IF}" oifname "${WAN_IF}" accept
+  }
+
+  chain output {
+    type filter hook output priority 0; policy accept;
+  }
+}
+
+table ip nat {
+  chain postrouting {
+    type nat hook postrouting priority 100; policy accept;
+    oifname "${WAN_IF}" masquerade
+  }
+}

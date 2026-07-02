@@ -1,0 +1,21 @@
+# Rendered from configs/dnsmasq.conf.tmpl — do not edit by hand.
+# DHCP + DNS for the LAN side only.
+
+interface=${LAN_IF}
+bind-interfaces
+except-interface=${WAN_IF}
+
+domain-needed
+bogus-priv
+no-resolv
+server=1.1.1.1
+server=9.9.9.9
+cache-size=1000
+
+dhcp-range=${DHCP_RANGE}
+dhcp-option=option:router,${LAN_GATEWAY_IP}
+dhcp-option=option:dns-server,${LAN_GATEWAY_IP}
+dhcp-authoritative
+
+# The captive portal hostname always resolves to this box.
+address=/${PORTAL_HOST}/${LAN_GATEWAY_IP}
