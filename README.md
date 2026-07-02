@@ -187,7 +187,9 @@ scripts/cybera-usb-nosuspend  helper invoked by the udev rule
 
 **Portal doesn't pop up on phones.**
 `systemctl status opennds` — if it failed, check `journalctl -u opennds`.
-Verify `GatewayInterface` in `/etc/opennds/opennds.conf` matches `LAN_IF`
+Verify `option gatewayinterface` in `/etc/config/opennds` matches `LAN_IF`
+(OpenNDS ≥10.1 reads UCI-format config from `/etc/config/opennds` on all
+distros — the legacy `/etc/opennds/opennds.conf` is silently ignored)
 and that the phone actually got a DHCP lease from this box
 (`journalctl -u dnsmasq | tail`).
 

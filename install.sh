@@ -126,7 +126,8 @@ render() { envsubst "$TVARS" < "$1" > "$2"; }
 
 render configs/nftables.conf.tmpl  /etc/nftables.conf
 render configs/dnsmasq.conf.tmpl   /etc/dnsmasq.d/cybera.conf
-render configs/opennds.conf.tmpl   /etc/opennds/opennds.conf
+install -d /etc/config
+render configs/opennds.conf.tmpl   /etc/config/opennds
 render configs/Caddyfile.tmpl      /etc/caddy/Caddyfile
 render configs/interfaces.tmpl     /etc/network/interfaces.d/cybera
 if [ "$WAN_IS_WIFI" -eq 0 ]; then

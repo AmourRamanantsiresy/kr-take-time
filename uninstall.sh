@@ -46,7 +46,7 @@ fi
 cat <<'EOF'
 Done. Left in place on purpose (shared system config — review manually):
   /etc/nftables.conf      (restore your own firewall rules)
-  /etc/opennds/opennds.conf
+  /etc/config/opennds
   /etc/caddy/Caddyfile
   apt packages (nftables, dnsmasq, opennds, postgresql, caddy, nodejs)
 EOF

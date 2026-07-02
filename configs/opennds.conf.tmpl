@@ -1,29 +1,33 @@
 # Rendered from configs/opennds.conf.tmpl — do not edit by hand.
-# OpenNDS captive portal — key/value config (Debian, non-UCI format).
-# Option names are parsed case-insensitively by opennds.
+# Installed to /etc/config/opennds — since OpenNDS 10.1 the config is
+# UCI format at this path on ALL distros (the legacy
+# /etc/opennds/opennds.conf is ignored).
 
-GatewayInterface ${LAN_IF}
-GatewayName ${GATEWAY_NAME}
-GatewayPort 2050
-MaxClients 250
+config opennds
+	option enabled '1'
+	option debuglevel '1'
 
-# FAS: our NestJS backend, reached through Caddy on port 80 at /fas.
-# fas_secure_enabled 1 → the query string arrives base64 encoded and
-# carries the hashed client id (hid). Authorization itself is done by
-# the backend via `ndsctl auth`, never by returning tokens to clients.
-FasPort 80
-FasPath /fas
-FasRemoteFQDN ${PORTAL_HOST}
-FasKey ${FAS_KEY}
-fas_secure_enabled 1
+	option gatewayinterface '${LAN_IF}'
+	option gatewayname '${GATEWAY_NAME}'
+	option gatewayport '2050'
+	option maxclients '250'
 
-# Time enforcement:
-#   SessionTimeout 0  → no global default; the backend passes an explicit
-#   per-client session timeout with every `ndsctl auth` call, computed
-#   from the account balance. OpenNDS auto-deauths when it elapses.
-SessionTimeout 0
-PreauthIdleTimeout 10
-AuthIdleTimeout 120
-CheckInterval 15
+	# FAS: our NestJS backend, reached through Caddy on port 80 at /fas.
+	# fasremotefqdn must resolve (via dnsmasq) to fasremoteip.
+	# fas_secure_enabled 1 → the query string arrives base64 encoded and
+	# carries the hashed client id (hid). Authorization itself is done by
+	# the backend via `ndsctl auth`, never by returning tokens to clients.
+	option fasport '80'
+	option faspath '/fas'
+	option fasremoteip '${LAN_GATEWAY_IP}'
+	option fasremotefqdn '${PORTAL_HOST}'
+	option faskey '${FAS_KEY}'
+	option fas_secure_enabled '1'
 
-DebugLevel 1
+	# Time enforcement: no global session timeout; the backend passes an
+	# explicit per-client timeout with every `ndsctl auth` call, computed
+	# from the account balance. OpenNDS auto-deauths when it elapses.
+	option sessiontimeout '0'
+	option preauthidletimeout '10'
+	option authidletimeout '120'
+	option checkinterval '15'
