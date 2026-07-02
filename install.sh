@@ -237,14 +237,30 @@ systemctl enable --now nftables
 nft -f /etc/nftables.conf
 systemctl enable --now dnsmasq
 systemctl restart dnsmasq
-systemctl enable --now opennds
-systemctl restart opennds
 systemctl enable --now caddy
 systemctl restart caddy
 systemctl enable --now cybera-backend
 systemctl restart cybera-backend
 systemctl enable --now cybera-session-manager
 systemctl restart cybera-session-manager
+
+# OpenNDS goes last: its startup probes the interfaces/upstream gateway
+# and can fail transiently while the network is still settling from the
+# NetworkManager reload above — retry before giving up, and dump its
+# journal if it truly cannot start.
+log "Starting OpenNDS"
+systemctl enable opennds
+for attempt in 1 2 3 4 5; do
+  if systemctl restart opennds; then
+    break
+  fi
+  if [ "$attempt" -eq 5 ]; then
+    journalctl -u opennds -n 25 --no-pager || true
+    die "opennds failed to start after 5 attempts — see its log above"
+  fi
+  warn "opennds failed to start (attempt $attempt/5) — retrying in 5s"
+  sleep 5
+done
 
 # ── 13. Summary ───────────────────────────────────────────────────────
 log "Install complete"
