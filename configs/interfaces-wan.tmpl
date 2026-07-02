@@ -1,0 +1,6 @@
+# Wired-WAN stanza, appended to /etc/network/interfaces.d/cybera by
+# install.sh when WAN_IF is not a wireless interface.
+
+auto ${WAN_IF}
+allow-hotplug ${WAN_IF}
+iface ${WAN_IF} inet dhcp

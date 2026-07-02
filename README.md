@@ -6,8 +6,12 @@ caps) via admin approval or prepaid vouchers, and are automatically cut off
 when their balance runs out.
 
 ```
-Starlink → [USB3 = WAN] Debian PC [onboard NIC = LAN] → router (AP/bridge) → users
+Starlink → [WAN] Debian PC [LAN] → router (AP/bridge) → users
 ```
+
+WAN/LAN roles are pure `.env` config, so any pairing works, e.g.
+USB3 Ethernet = WAN + onboard NIC = LAN, or **Wi-Fi = WAN** (the box
+joins the Starlink Wi-Fi) + USB3 Ethernet = LAN.
 
 **Stack:** nftables (NAT/firewall) · dnsmasq (DHCP/DNS) · OpenNDS (captive
 portal + time enforcement) · PostgreSQL · NestJS backend (also the OpenNDS
@@ -33,8 +37,15 @@ FAS) · React + Vite + MUI frontend · Caddy (reverse proxy) · systemd.
 ### Which interface is which?
 
 Run `ip -o link`. The onboard NIC is usually `enp…`/`eth0`; the USB adapter
-usually shows up as `enx<mac>`. Interface names go in `.env` and are
-**never hardcoded** — the same repo works across machines and reinstalls.
+usually shows up as `enx<mac>`; Wi-Fi is `wlp…`. Interface names go in
+`.env` and are **never hardcoded** — the same repo works across machines
+and reinstalls.
+
+**Wi-Fi as WAN:** set `WAN_IF` to the wireless interface and join the
+Starlink Wi-Fi in the desktop UI (or `nmcli dev wifi connect …`) *before*
+running the installer. The installer detects a wireless WAN, leaves it
+under NetworkManager (pinning the connection to autoconnect, system-wide),
+and hands only the LAN interface to ifupdown. The LAN side must be wired.
 
 ---
 

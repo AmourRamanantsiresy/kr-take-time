@@ -39,13 +39,22 @@ case "$FAS_KEY$JWT_SECRET$DB_PASS$ADMIN_PASS" in
   *change-me*) die ".env still contains change-me placeholders — edit it first" ;;
 esac
 
-ip link show "$WAN_IF" >/dev/null 2>&1 || warn "WAN_IF=$WAN_IF not present right now (USB adapter unplugged?)"
+ip link show "$WAN_IF" >/dev/null 2>&1 || warn "WAN_IF=$WAN_IF not present right now (adapter unplugged?)"
 ip link show "$LAN_IF" >/dev/null 2>&1 || die  "LAN_IF=$LAN_IF does not exist — fix .env"
 
+# Wi-Fi WAN (e.g. the box joins Starlink's Wi-Fi): the association is
+# left to NetworkManager; ifupdown only ever manages a wired WAN.
+WAN_IS_WIFI=0
+if [ -d "/sys/class/net/$WAN_IF/wireless" ]; then
+  WAN_IS_WIFI=1
+fi
+WAN_KIND="wired"
+[ "$WAN_IS_WIFI" -eq 1 ] && WAN_KIND="Wi-Fi"
+
 echo
-echo "    WAN (Starlink, USB) : $WAN_IF"
-echo "    LAN (users, onboard): $LAN_IF  ->  $LAN_GATEWAY_IP ($LAN_SUBNET)"
-echo "    Portal              : http://$PORTAL_HOST"
+echo "    WAN (Starlink, $WAN_KIND): $WAN_IF"
+echo "    LAN (users)          : $LAN_IF  ->  $LAN_GATEWAY_IP ($LAN_SUBNET)"
+echo "    Portal               : http://$PORTAL_HOST"
 echo
 read -r -p "Proceed with these settings? [y/N] " ans
 [ "${ans,,}" = "y" ] || die "aborted"
@@ -110,6 +119,9 @@ render configs/dnsmasq.conf.tmpl   /etc/dnsmasq.d/cybera.conf
 render configs/opennds.conf.tmpl   /etc/opennds/opennds.conf
 render configs/Caddyfile.tmpl      /etc/caddy/Caddyfile
 render configs/interfaces.tmpl     /etc/network/interfaces.d/cybera
+if [ "$WAN_IS_WIFI" -eq 0 ]; then
+  envsubst "$TVARS" < configs/interfaces-wan.tmpl >> /etc/network/interfaces.d/cybera
+fi
 install -m 644 configs/sysctl-cybera.conf /etc/sysctl.d/90-cybera.conf
 
 # Runtime env for the services (root-owned, group-readable by cybera)
@@ -123,11 +135,12 @@ chown root:cybera /etc/cybera/cybera.env
 chmod 640 /etc/cybera/cybera.env
 
 # ── 9. USB autosuspend off for the WAN adapter ────────────────────────
-log "Disabling USB autosuspend for $WAN_IF"
+log "Disabling USB autosuspend for USB-attached gateway interfaces"
 install -m 755 scripts/cybera-usb-nosuspend /usr/local/bin/cybera-usb-nosuspend
 render configs/udev-usb-wan.rules.tmpl /etc/udev/rules.d/90-cybera-usb-wan.rules
 udevadm control --reload
 /usr/local/bin/cybera-usb-nosuspend "$WAN_IF" || true
+/usr/local/bin/cybera-usb-nosuspend "$LAN_IF" || true
 
 # ── 10. Scoped sudoers for ndsctl ─────────────────────────────────────
 log "Installing scoped sudoers entry (cybera -> ndsctl only)"
@@ -144,16 +157,35 @@ systemctl daemon-reload
 log "Applying network configuration"
 sysctl --system >/dev/null
 
-# Desktop installs: NetworkManager must hand the gateway NICs over to
-# ifupdown, or it will keep rewriting their addresses.
+# Desktop installs: NetworkManager must hand the ifupdown-managed NICs
+# over, or it will keep rewriting their addresses. A Wi-Fi WAN stays
+# with NetworkManager (it owns the association + credentials); it just
+# gets pinned to autoconnect system-wide.
 if systemctl is-active --quiet NetworkManager 2>/dev/null; then
-  warn "NetworkManager detected — marking $WAN_IF and $LAN_IF as unmanaged"
+  if [ "$WAN_IS_WIFI" -eq 1 ]; then
+    UNMANAGED="interface-name:${LAN_IF}"
+    warn "Wi-Fi WAN: leaving $WAN_IF under NetworkManager control"
+    WIFI_CON="$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null \
+      | awk -F: -v dev="$WAN_IF" '$2 == dev { print $1; exit }')"
+    if [ -n "$WIFI_CON" ]; then
+      nmcli connection modify "$WIFI_CON" \
+        connection.autoconnect yes connection.permissions '' || true
+      echo "    Wi-Fi connection '$WIFI_CON' pinned to autoconnect for all users"
+    else
+      warn "$WAN_IF has no active Wi-Fi connection — join the Starlink Wi-Fi, then re-run"
+    fi
+  else
+    UNMANAGED="interface-name:${WAN_IF};interface-name:${LAN_IF}"
+    warn "NetworkManager detected — marking $WAN_IF and $LAN_IF as unmanaged"
+  fi
   install -d /etc/NetworkManager/conf.d
   cat > /etc/NetworkManager/conf.d/90-cybera-unmanaged.conf <<NMEOF
 [keyfile]
-unmanaged-devices=interface-name:${WAN_IF};interface-name:${LAN_IF}
+unmanaged-devices=${UNMANAGED}
 NMEOF
   systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager
+elif [ "$WAN_IS_WIFI" -eq 1 ]; then
+  warn "Wi-Fi WAN but NetworkManager is not running — configure wpa_supplicant for $WAN_IF yourself"
 fi
 
 # dnsmasq must own :53 — make sure nothing else does
@@ -162,7 +194,9 @@ if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
   systemctl disable --now systemd-resolved
 fi
 
-ifup "$WAN_IF" 2>/dev/null || true
+if [ "$WAN_IS_WIFI" -eq 0 ]; then
+  ifup "$WAN_IF" 2>/dev/null || true
+fi
 ifup "$LAN_IF" 2>/dev/null || ip addr replace "${LAN_GATEWAY_IP}/$(echo "$LAN_SUBNET" | cut -d/ -f2)" dev "$LAN_IF"
 ip link set "$LAN_IF" up
 

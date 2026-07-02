@@ -1,5 +1,7 @@
 # Rendered from configs/udev-usb-wan.rules.tmpl — do not edit by hand.
 # Installed to /etc/udev/rules.d/90-cybera-usb-wan.rules
-# When the WAN USB Ethernet adapter appears, disable USB autosuspend on
-# its parent USB device so the uplink never sleeps.
+# Disable USB autosuspend for whichever gateway interface sits on a USB
+# device (Ethernet adapter or Wi-Fi dongle, WAN or LAN role). The helper
+# is a no-op for non-USB (PCI/onboard) interfaces.
 ACTION=="add", SUBSYSTEM=="net", ENV{INTERFACE}=="${WAN_IF}", RUN+="/usr/local/bin/cybera-usb-nosuspend ${WAN_IF}"
+ACTION=="add", SUBSYSTEM=="net", ENV{INTERFACE}=="${LAN_IF}", RUN+="/usr/local/bin/cybera-usb-nosuspend ${LAN_IF}"
